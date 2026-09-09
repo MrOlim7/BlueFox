@@ -35,8 +35,24 @@ Environnement : Linux, Python 3.12.3, installation dans `.venv` avec `python -m 
 
 Dépendances réellement résolues localement : requests 2.34.2, pystyle 2.9, python-whois 0.9.6, dnspython 2.8.0, beautifulsoup4 4.15.0, Pillow 12.3.0, pypresence 4.6.2 ; pytest 9.1.1, build 1.6.0. Ces versions décrivent cette exécution, pas un verrouillage universel des dépendances.
 
+## CI Linux / Windows / macOS exécutée
+
+Après activation de GitHub Actions par le propriétaire, le 9 septembre 2026, la PR brouillon #3 a été synchronisée avec le commit de déclenchement `35e2d2413b9d5cdd6c54fbb8efa784d8890f4dd9` sur `fix/v3-foundation`. Le [run 34387310996](https://github.com/MrOlim7/BlueFox/actions/runs/34387310996), événement `pull_request`, est terminé avec la conclusion **success** : **15 jobs sur 15 réussis**. Les étapes et journaux des 15 jobs ont été lus pour confirmer les résultats pytest et la construction des distributions.
+
+| Runner réellement utilisé | Versions Python | Résultat pytest par version | Construction sdist + wheel | Syntaxe Bash |
+|---|---|---|---|---|
+| `ubuntu-latest` — Ubuntu 24.04.5 | 3.10, 3.11, 3.12, 3.13, 3.14 | 62 réussis, 1 ignoré | Réussie sur les 5 versions | Réussie sur les 5 versions |
+| `windows-latest` — Windows Server 2025 | 3.10, 3.11, 3.12, 3.13, 3.14 | 63 réussis, aucun ignoré | Réussie sur les 5 versions | Non applicable |
+| `macos-latest` — macOS 26.6.2, ARM64 | 3.10, 3.11, 3.12, 3.13, 3.14 | 62 réussis, 1 ignoré | Réussie sur les 5 versions | Réussie sur les 5 versions |
+
+L’installation `python -m pip install -e ".[full,dev]"` a réussi dans chaque job. Le seul test ignoré sous Linux/macOS est `test_windows_setup_propagates_install_failure`, réservé à `cmd.exe`. Sous Windows, les tests exécutent réellement les lanceurs `.bat`, depuis un autre dossier et avec des chemins/arguments contenant des espaces, vérifient le Python du venv et la propagation du code de sortie ; le test de `setup.bat` simule l’échec de pip sans téléchargement. Les gardes réseau restent actifs sur les trois systèmes.
+
+Aucun échec de test, de packaging ou de lanceur n’a été observé ; aucune correction du code applicatif n’a été nécessaire. La désactivation des Actions mentionnée dans le bilan initial est donc levée. Ce suivi reste limité au lot 1 ; ni lot 2, ni fusion, ni publication de release.
+
 ## Limites
 
-Windows et macOS ne sont pas disponibles dans cet environnement local. La CI configure 15 combinaisons (3 OS × Python 3.10–3.14). Après création de la PR brouillon #3, l’API `repos/MrOlim7/BlueFox/actions/permissions` retourne `enabled: false` et la liste des runs est vide : **GitHub Actions est désactivé dans le dépôt, aucun job CI n’a été exécuté**. La matrice ajoutée n’est donc pas une validation multiplateforme ; aucune modification des réglages administratifs du dépôt n’a été effectuée. Les tests `.bat` ne s’exécutent que sous Windows. Les permissions sont simulées pour rester fiables même avec des droits élevés ; le remplacement atomique et les droits POSIX du fichier créé sont testés réellement sous Linux.
+Les résultats CI couvrent les images et versions ci-dessus, pas toutes les distributions Linux, Windows de bureau ou macOS Intel, ni un essai manuel exhaustif en terminal. L’installation du wheel dans un second venv vierge reste une vérification locale Linux ; la CI installe le projet en mode éditable puis construit les distributions. Les permissions refusées et Ctrl+C sont simulés ; le remplacement atomique et les droits POSIX du fichier créé sont testés réellement sur les runners POSIX.
+
+Les journaux CI signalent un avertissement de dépréciation Node.js 20 pour `actions/checkout@v4` et `actions/setup-python@v5`, exécutés par GitHub avec Node.js 24. Cet avertissement n’a fait échouer aucun job ; le workflow n’a pas été modifié pendant cette vérification.
 
 Les dépendances ont été téléchargées pour l’installation, mais aucun outil n’a interrogé un tiers : pas de recherche OSINT, scan, DNS public, API métier ou connexion Discord. Les intégrations, quotas, tarifs et performances ne sont pas certifiés. Les bugs métier et limitations de migration sont explicités dans [KNOWN_ISSUES.md](KNOWN_ISSUES.md). Les tests portent sur la remise en route et la compatibilité, pas sur les 49 moteurs historiques dans tous leurs cas. Une compilation syntaxique n’est pas utilisée comme preuve de démarrage.

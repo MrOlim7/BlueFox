@@ -10,6 +10,7 @@
 - Retire le fichier utilisateur du suivi Git, fournit un exemple vide et sépare la version logicielle.
 - Corrige les chemins/interpréteurs/arguments/codes de sortie des lanceurs ; installation isolée explicite et packaging déclaratif avec commande `bluefox`.
 - Ajoute un doctor sans réseau, des tests de régression simulés et une matrice CI Linux/Windows/macOS, Python 3.10–3.14.
+- Après activation de GitHub Actions : 15/15 jobs exécutés avec succès, 63 tests par version sous Windows et 62 réussis/1 ignoré sous Linux et macOS ; aucune correction applicative nécessaire. Preuves et limites dans le bilan de validation.
 
 Vérifications exécutées et limites : [VALIDATION.md](VALIDATION.md). Bugs métier conservés : [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
 

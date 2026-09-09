@@ -1,53 +1,20 @@
 #!/usr/bin/env bash
-# BlueFox v2.5 beta — Linux / macOS launcher
-# ─────────────────────────────────────────────────────────────────────────────
-
-set -e
-
-PYTHON_BIN=""
-
-# Find a compatible Python 3.10+ interpreter
-for candidate in python3.12 python3.11 python3.10 python3 python; do
-    if command -v "$candidate" &>/dev/null; then
-        ver=$("$candidate" -c "import sys; print(sys.version_info >= (3,10))" 2>/dev/null)
-        if [ "$ver" = "True" ]; then
-            PYTHON_BIN="$candidate"
-            break
-        fi
-    fi
-done
-
-if [ -z "$PYTHON_BIN" ]; then
-    echo ""
-    echo "  [!] BlueFox requires Python 3.10 or higher."
-    echo "      Install it from https://www.python.org/downloads/"
-    echo ""
+# Use only this checkout's virtual environment; never install on launch.
+set -eu
+BLUEFOX_ROOT="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+cd -- "$BLUEFOX_ROOT"
+if [ -x "$BLUEFOX_ROOT/.venv/bin/python" ]; then
+    BLUEFOX_PYTHON="$BLUEFOX_ROOT/.venv/bin/python"
+elif [ -x "$BLUEFOX_ROOT/venv/bin/python" ]; then
+    BLUEFOX_PYTHON="$BLUEFOX_ROOT/venv/bin/python"
+else
+    echo 'BlueFox: environnement absent. Dans le dossier du dépôt, exécutez :' >&2
+    echo '  python3 -m venv .venv' >&2
+    echo '  .venv/bin/python -m pip install -e ".[full]"' >&2
     exit 1
 fi
-
-echo ""
-echo "  [>] Using $($PYTHON_BIN --version)"
-
-# Check for a virtual environment
-if [ -d ".venv" ]; then
-    echo "  [>] Activating .venv ..."
-    # shellcheck disable=SC1091
-    source .venv/bin/activate
-elif [ -d "venv" ]; then
-    echo "  [>] Activating venv ..."
-    # shellcheck disable=SC1091
-    source venv/bin/activate
+if ! "$BLUEFOX_PYTHON" -c 'import sys; sys.exit(0 if (3, 10) <= sys.version_info[:2] <= (3, 14) else 1)'; then
+    echo 'BlueFox: recréez le venv avec Python 3.10 à 3.14.' >&2
+    exit 1
 fi
-
-# Check dependencies
-if ! "$PYTHON_BIN" -c "import requests" &>/dev/null 2>&1; then
-    echo ""
-    echo "  [!] Some dependencies are missing. Installing now ..."
-    echo ""
-    "$PYTHON_BIN" -m pip install -r requirements.txt --quiet
-fi
-
-echo "  [>] Launching BlueFox ..."
-echo ""
-
-"$PYTHON_BIN" BlueFox.py
+exec "$BLUEFOX_PYTHON" "$BLUEFOX_ROOT/BlueFox.py" "$@"

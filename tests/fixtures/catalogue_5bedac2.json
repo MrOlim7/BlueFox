@@ -1,0 +1,238 @@
+{
+  "NETWORK": [
+    [
+      "Ping",
+      "ping_ip"
+    ],
+    [
+      "IP Lookup / Geolocation",
+      "ip_lookup"
+    ],
+    [
+      "Traceroute",
+      "traceroute"
+    ],
+    [
+      "Reverse DNS",
+      "reverse_dns"
+    ],
+    [
+      "Port Scanner",
+      "port_scanner"
+    ],
+    [
+      "TCP Connect Test",
+      "tcp_connect_test"
+    ],
+    [
+      "DNS Records",
+      "dns_records"
+    ],
+    [
+      "WHOIS Lookup",
+      "whois_lookup"
+    ],
+    [
+      "ASN Information",
+      "asn_info"
+    ],
+    [
+      "Blacklist Check",
+      "blacklist_check"
+    ],
+    [
+      "My IP / Network Info",
+      "my_ip_info"
+    ],
+    [
+      "Netblock Host Counter",
+      "netblock_host_counter"
+    ],
+    [
+      "TLS Version Probe",
+      "tls_version_probe"
+    ]
+  ],
+  "OSINT": [
+    [
+      "Social Media Lookup",
+      "social_media_lookup"
+    ],
+    [
+      "Username Search (50+ sites)",
+      "username_lookup"
+    ],
+    [
+      "Username Variations",
+      "username_variations"
+    ],
+    [
+      "Email OSINT",
+      "email_osint"
+    ],
+    [
+      "Email Permutations",
+      "email_permutations"
+    ],
+    [
+      "Phone Number OSINT",
+      "phone_osint"
+    ],
+    [
+      "Domain OSINT (Full)",
+      "domain_osint"
+    ],
+    [
+      "Subdomain Finder",
+      "subdomain_finder"
+    ],
+    [
+      "Google Dork Generator",
+      "google_dork_generator"
+    ],
+    [
+      "GitHub Dork Pack",
+      "github_dork_pack"
+    ],
+    [
+      "Wayback Machine",
+      "wayback_machine"
+    ],
+    [
+      "Breach / Leak Check",
+      "haveibeenpwned"
+    ],
+    [
+      "IP/Domain Reputation Links",
+      "ip_reputation_links"
+    ],
+    [
+      "Image Metadata / EXIF",
+      "image_metadata"
+    ],
+    [
+      "Tech Stack Detector",
+      "tech_stack_detector"
+    ],
+    [
+      "Shodan Search",
+      "shodan_search"
+    ],
+    [
+      "VirusTotal Check",
+      "virustotal_check"
+    ]
+  ],
+  "WEB": [
+    [
+      "URL Recon",
+      "url_recon"
+    ],
+    [
+      "Robots / Sitemap Audit",
+      "robots_sitemap_audit"
+    ],
+    [
+      "HTTP Headers Analysis",
+      "http_headers"
+    ],
+    [
+      "SSL Certificate Info",
+      "ssl_cert_info"
+    ],
+    [
+      "Tech Stack Detector",
+      "tech_stack_detector"
+    ],
+    [
+      "Host Header Probe",
+      "host_header_probe"
+    ],
+    [
+      "Security.txt Audit",
+      "security_txt_audit"
+    ],
+    [
+      "Redirect Chain Analyzer",
+      "redirect_chain_analyzer"
+    ]
+  ],
+  "REPORTS": [
+    [
+      "Generer un rapport",
+      "report_generator"
+    ],
+    [
+      "Voir les resultats sauvegardes",
+      "list_saved_results"
+    ]
+  ],
+  "DISCOVERY": [
+    [
+      "HTTP Title Probe",
+      "http_title_probe"
+    ],
+    [
+      "Favicon Hash",
+      "favicon_hash"
+    ],
+    [
+      "DNS Lookup Suite",
+      "dns_lookup_suite"
+    ],
+    [
+      "DNS Resolver Compare",
+      "dns_resolver_compare"
+    ],
+    [
+      "Zone Transfer Test",
+      "dns_zone_transfer_test"
+    ],
+    [
+      "Subdomain Resolver",
+      "subdomain_resolver"
+    ],
+    [
+      "Ping Sweep CIDR",
+      "ping_sweep_cidr"
+    ],
+    [
+      "Banner Grabber",
+      "banner_grabber"
+    ]
+  ],
+  "INTEL": [
+    [
+      "IOC Analyzer",
+      "ioc_analyzer"
+    ],
+    [
+      "File Hash Audit",
+      "file_hash_audit"
+    ],
+    [
+      "Password Strength Estimator",
+      "password_strength_estimator"
+    ],
+    [
+      "Username Variations",
+      "username_variations"
+    ],
+    [
+      "Email Permutations",
+      "email_permutations"
+    ],
+    [
+      "IP/Domain Reputation Links",
+      "ip_reputation_links"
+    ],
+    [
+      "Netblock Host Counter",
+      "netblock_host_counter"
+    ],
+    [
+      "TLS Version Probe",
+      "tls_version_probe"
+    ]
+  ]
+}

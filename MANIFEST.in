@@ -1,0 +1,6 @@
+include LICENSE
+include start.sh start.bat setup.bat
+recursive-include docs *.md
+recursive-include tests *.py *.json
+include Program/bluefox_config.example.json
+exclude Program/bluefox_config.json

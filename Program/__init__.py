@@ -1,4 +1,3 @@
-"""BlueFox program package."""
-
-from .legacy_tools import CONFIG  # re-export for convenience
-
+"""Importing configuration must not import legacy tools."""
+from .config import CONFIG
+from .version import __version__

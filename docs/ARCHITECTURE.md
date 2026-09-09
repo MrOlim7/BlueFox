@@ -1,97 +1,29 @@
-# BlueFox Architecture — v2.5 beta
+# Architecture — fondations v3
 
----
+Le point d’entrée `BlueFox.main(argv)` traite les options puis les menus. `Program.ui` reste léger : bibliothèque standard, gestionnaire de configuration, saisie, affichage avec masquage des clés configurées et dispatch. Il ne dépend pas du monolithe historique. L’import de `Program` n’importe plus `legacy_tools`.
 
-## Overview
+## Registre et compatibilité temporaire
 
-BlueFox uses a menu-driven terminal UI and a fully modular backend.
-The startup sequence, UI loop, and tool dispatch are separated from tool logic.
+`Program/catalogue.py` constitue l’inventaire explicite : identifiant, nom, catégories, module, point d’entrée, mode `base` ou `legacy`. `ToolRegistry` valide les identifiants et catégories avant les imports, trie par identifiant et construit un seul `ToolEntry` par outil. Un échec d’import renseigne `unavailable_reason` sur l’entrée existante. Les dépendances requises et les enrichissements facultatifs sont distingués. Les commandes système sont détectées par leur présence, sans exécution.
 
----
+Le dispatch des entrées `base` collecte les entrées, appelle `BaseTool.run(**inputs)` et présente son dictionnaire existant. Ping et IP Lookup sont les deux implémentations migrées. Le contrat existant n’est pas encore l’enveloppe complète proposée par l’audit (`status`, `sources`, temps, etc.). Ce lot ne prétend pas achever cette évolution.
 
-## Runtime Layers
+Le dispatch `legacy` appelle directement la fonction interactive et ignore son retour. Il ne capture pas stdout et ne fabrique pas un résultat de succès. Les pauses, exports, erreurs et interactions internes restent ceux de ces fonctions, avec des alias d’UI partagés. Cette compatibilité est **temporaire** : lors de chaque migration, conserver l’ID, remplacer son point d’entrée dans l’inventaire par une classe et vérifier les comportements conservés.
 
-```
-┌─────────────────────────────────────────────────────────┐
-│  BlueFox.py                                             │
-│  ─ Boot animation (4 phases)                            │
-│  ─ Main menu / category menu loop                       │
-│  ─ Tool dispatch + error handling                       │
-│  ─ Settings panel                                       │
-└──────────────────────┬──────────────────────────────────┘
-                       │ imports
-┌──────────────────────▼──────────────────────────────────┐
-│  Program/registry.py                                    │
-│  ─ Central category map (name, description, tool list)  │
-└──────────────────────┬──────────────────────────────────┘
-                       │ imports
-┌──────────────────────▼──────────────────────────────────┐
-│  Program/<category>.py                                  │
-│  (network / osint / web / discovery / intel / reports)  │
-│  ─ Imports tool entrypoints from Program/tools/         │
-│  ─ Builds TOOLS list for the registry                   │
-└──────────────────────┬──────────────────────────────────┘
-                       │ imports
-┌──────────────────────▼──────────────────────────────────┐
-│  Program/tools/*.py                                     │
-│  ─ One file per tool                                    │
-│  ─ Each exposes run()                                   │
-└──────────────────────┬──────────────────────────────────┘
-                       │ calls
-┌──────────────────────▼──────────────────────────────────┐
-│  Program/legacy_tools.py                                │
-│  ─ Shared helpers (color, input, print, save, config)   │
-│  ─ Legacy full-function implementations                 │
-│  ─ Discord RPC wrapper                                  │
-└─────────────────────────────────────────────────────────┘
-```
+Les six anciens modules de catégorie exportent toujours une liste `TOOLS` de noms et fonctions interactives, en passant par le même registre/dispatch. `Program.tools.ip_lookup.run()` et `ping_ip.run()` sont des wrappers explicites. `ping_ip` est un alias du seul ID `ping`. Les anciennes fonctions directes de `legacy_tools` subsistent pour les anciens appelants ; elles ne constituent pas une seconde inscription au menu.
 
----
+L’[inventaire détaillé](CATALOGUE.md) et la fixture issue du commit audité rendent visibles les alias, raccourcis intercatégories et l’ancien outil orphelin.
 
-## Boot Sequence (v2.5)
+## Configuration unique
 
-```
-Phase 1  Matrix Rain       16 frames × 0.04s   ≈ 0.6 s
-Phase 2  Boot Log Stream   27 entries × 0.068s ≈ 1.9 s
-Phase 3  Module Panel      10 steps × 0.14s    ≈ 1.4 s
-Phase 4  Logo + Enter      9 blinks × 0.22s    ≈ 2.0 s
-─────────────────────────────────────────────────────────
-Total before Enter prompt                       ≈ 6 s
-```
+`Program.config.config`, `Program.CONFIG`, `Program.settings.CONFIG` et `legacy_tools.CONFIG` désignent le même gestionnaire. L’interface `MutableMapping` maintient temporairement les accès `CONFIG[key]` sans dictionnaire séparé. Les méthodes `load_local_config`/`save_local_config` délèguent au gestionnaire ; le monolithe ne recharge plus la configuration à l’import.
 
----
+Les couches sont séparées : défauts, JSON local, environnement, options explicites. `set` modifie seulement la couche locale ; `set_overrides` configure la session. Seule la couche locale est sérialisée. Les exports historiques utilisent `config.results_path()`, partagé avec le diagnostic. La version est dans `Program/version.py`, utilisée par l’entrée CLI, les métadonnées du paquet, les rapports et l’agent HTTP historique.
 
-## Configuration
+Les erreurs de chargement de modules ne restituent pas le contenu arbitraire des exceptions. L’UI commune masque les valeurs des clés présentes dans les couches de configuration. Cette mesure ne remplace pas la future refonte des requêtes et des exports : les résultats métier historiques ne sont pas validés par ce lot.
 
-Local config file: `Program/bluefox_config.json`
+## Packaging et diagnostic
 
-Contains:
-- `version` — current app version string
-- `ui_theme` — color theme name
-- `results_folder` — export output path
-- `max_workers` — thread pool ceiling
-- `*_api_key` — optional API credentials (6 providers)
+`pyproject.toml` est déclaratif et expose `bluefox = BlueFox:main`. `requests` est la dépendance minimale ; `[full]` installe les imports facultatifs historiques et `[dev]` les outils de test/construction. `requirements.txt` et `setup.py` délèguent à ces métadonnées. Aucun fichier utilisateur de configuration ne doit entrer dans les distributions.
 
-Environment variables override the JSON file at startup (see `load_local_config()`).
-
----
-
-## Platform Compatibility
-
-| Layer | Windows | Linux | macOS |
-|---|---|---|---|
-| Terminal colors (pystyle) | ✓ | ✓ | ✓ |
-| Box-drawing characters | ✓ | ✓ | ✓ |
-| Ping / traceroute subprocess | ✓ (ipconfig / tracert) | ✓ | ✓ |
-| Network info (ifconfig / ipconfig) | ipconfig | ifconfig / ip addr | ifconfig |
-| Port scanning (sockets) | ✓ | ✓ | ✓ |
-| Discord RPC (pypresence) | ✓ | ✓ | ✓ |
-
----
-
-## Design Goals
-
-- Keep tool logic isolated — one file per tool, one `run()` per file.
-- Minimize regressions when adding tools.
-- Support fast iteration toward future major versions.
-- Zero platform-specific code in individual tools — delegate to helpers.
+`doctor` importe les modules, inspecte les commandes du PATH et teste localement l’écriture. Il ne teste aucune capacité réseau et le démarrage ne déclare plus de pile réseau ou RPC « active ». Discord n’est pas initialisé par l’application. Les tests bloquent le réseau et simulent HTTP, DNS, sockets et commandes pour les parcours qui en ont besoin.

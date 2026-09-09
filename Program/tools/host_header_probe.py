@@ -10,7 +10,7 @@ def run():
         return
 
     core.print_header("HOST HEADER PROBE")
-    headers = {"Host": host_header, "User-Agent": "BlueFox/2.4"}
+    headers = {"Host": host_header, "User-Agent": f"BlueFox/{core.__version__}"}
     data = {"url": url, "host_header": host_header}
 
     try:

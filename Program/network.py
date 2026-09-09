@@ -1,31 +1,4 @@
-from .tools import (
-    asn_info,
-    blacklist_check,
-    dns_records,
-    ip_lookup,
-    my_ip_info,
-    netblock_host_counter,
-    ping_ip,
-    port_scanner,
-    reverse_dns,
-    tcp_connect_test,
-    tls_version_probe,
-    traceroute,
-    whois_lookup,
-)
+"""Temporary category compatibility; canonical inventory lives in catalogue.py."""
+from .registry import legacy_category_tools
 
-TOOLS = [
-    ("Ping", ping_ip.run),
-    ("IP Lookup / Geolocation", ip_lookup.run),
-    ("Traceroute", traceroute.run),
-    ("Reverse DNS", reverse_dns.run),
-    ("Port Scanner", port_scanner.run),
-    ("TCP Connect Test", tcp_connect_test.run),
-    ("DNS Records", dns_records.run),
-    ("WHOIS Lookup", whois_lookup.run),
-    ("ASN Information", asn_info.run),
-    ("Blacklist Check", blacklist_check.run),
-    ("My IP / Network Info", my_ip_info.run),
-    ("Netblock Host Counter", netblock_host_counter.run),
-    ("TLS Version Probe", tls_version_probe.run),
-]
+TOOLS = legacy_category_tools("NETWORK")

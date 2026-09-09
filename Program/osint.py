@@ -1,39 +1,4 @@
-from .tools import (
-    domain_osint,
-    email_osint,
-    email_permutations,
-    github_dork_pack,
-    google_dork_generator,
-    haveibeenpwned,
-    image_metadata,
-    ip_reputation_links,
-    phone_osint,
-    shodan_search,
-    social_media_lookup,
-    subdomain_finder,
-    tech_stack_detector,
-    username_lookup,
-    username_variations,
-    virustotal_check,
-    wayback_machine,
-)
+"""Temporary category compatibility; canonical inventory lives in catalogue.py."""
+from .registry import legacy_category_tools
 
-TOOLS = [
-    ("Social Media Lookup", social_media_lookup.run),
-    ("Username Search (50+ sites)", username_lookup.run),
-    ("Username Variations", username_variations.run),
-    ("Email OSINT", email_osint.run),
-    ("Email Permutations", email_permutations.run),
-    ("Phone Number OSINT", phone_osint.run),
-    ("Domain OSINT (Full)", domain_osint.run),
-    ("Subdomain Finder", subdomain_finder.run),
-    ("Google Dork Generator", google_dork_generator.run),
-    ("GitHub Dork Pack", github_dork_pack.run),
-    ("Wayback Machine", wayback_machine.run),
-    ("Breach / Leak Check", haveibeenpwned.run),
-    ("IP/Domain Reputation Links", ip_reputation_links.run),
-    ("Image Metadata / EXIF", image_metadata.run),
-    ("Tech Stack Detector", tech_stack_detector.run),
-    ("Shodan Search", shodan_search.run),
-    ("VirusTotal Check", virustotal_check.run),
-]
+TOOLS = legacy_category_tools("OSINT")

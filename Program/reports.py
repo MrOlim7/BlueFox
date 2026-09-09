@@ -1,6 +1,4 @@
-from .tools import list_saved_results, report_generator
+"""Temporary category compatibility; canonical inventory lives in catalogue.py."""
+from .registry import legacy_category_tools
 
-TOOLS = [
-    ("Generer un rapport", report_generator.run),
-    ("Voir les resultats sauvegardes", list_saved_results.run),
-]
+TOOLS = legacy_category_tools("REPORTS")

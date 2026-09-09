@@ -1,5 +1,23 @@
 # BlueFox Patch Notes
 
+## 3.0.0a1 — fondations v3, non publiée
+
+- Répare les imports, les menus, réglages, Ctrl+C/EOF et ajoute aide/version/démarrage rapide sans attente.
+- Restaure l’inventaire complet avec 51 IDs, alias Ping et réintégration de Subnet Calculator. Conserve explicitement 49 fonctions historiques interactives et distingue leur dispatch des deux BaseTool.
+- Garde les outils indisponibles au catalogue avec leur cause ; ordre stable et doublons refusés.
+- Unifie la configuration, valide les types/thèmes/workers et applique défauts < local < environnement < options. Les clés d’environnement ne sont pas copiées lors d’une sauvegarde.
+- Rétablit thème/dossier/workers et saisie masquée des clés, conservation/suppression explicite et erreurs de sauvegarde honnêtes. Migration conservant l’original, écriture atomique et protection des JSON illisibles.
+- Retire le fichier utilisateur du suivi Git, fournit un exemple vide et sépare la version logicielle.
+- Corrige les chemins/interpréteurs/arguments/codes de sortie des lanceurs ; installation isolée explicite et packaging déclaratif avec commande `bluefox`.
+- Ajoute un doctor sans réseau, des tests de régression simulés et une matrice CI Linux/Windows/macOS, Python 3.10–3.14.
+- Après activation de GitHub Actions : 15/15 jobs exécutés avec succès, 63 tests par version sous Windows et 62 réussis/1 ignoré sous Linux et macOS ; aucune correction applicative nécessaire. Preuves et limites dans le bilan de validation.
+
+Vérifications exécutées et limites : [VALIDATION.md](VALIDATION.md). Bugs métier conservés : [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
+
+## Historique antérieur
+
+Les notes ci-dessous sont conservées comme historique. Leurs affirmations de couverture plateforme, de fiabilité ou de capacités ne valent pas certification de cette préversion ; seule la validation documentée du lot 1 s’applique.
+
 ---
 
 ## v2.5 beta

@@ -68,3 +68,10 @@ class IPLookupTool(BaseTool):
             return {"success": True, "data": data}
         except Exception as e:
             return {"success": False, "error": str(e)}
+
+
+def run():
+    """Temporary interactive entrypoint for historical callers."""
+    from Program.registry import registry
+    from Program.ui import run_tool
+    return run_tool(registry.get("ip_lookup"), pause_after=False)

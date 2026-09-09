@@ -10,6 +10,7 @@ from urllib.parse import urlparse, quote
 import requests
 
 from . import legacy_tools as core
+from .version import __version__
 
 try:
     import dns.query
@@ -20,7 +21,7 @@ except Exception:
 
 
 def _http_headers():
-    return {"User-Agent": "BlueFox/2.4"}
+    return {"User-Agent": f"BlueFox/{__version__}"}
 
 
 def http_title_probe():

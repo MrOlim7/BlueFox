@@ -9,3 +9,7 @@ results/
 venv/
 .venv/
 env/
+*.egg-info/
+build/
+dist/
+.coverage

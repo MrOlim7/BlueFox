@@ -9,7 +9,7 @@ def run():
     core.print_header(f"REDIRECT CHAIN ANALYZER - {url}")
     data = {"url": url, "chain": []}
     try:
-        r = core.requests.get(url, timeout=15, allow_redirects=True, headers={"User-Agent": "BlueFox/2.4"})
+        r = core.requests.get(url, timeout=15, allow_redirects=True, headers={"User-Agent": f"BlueFox/{core.__version__}"})
         if r.history:
             for hop in r.history:
                 line = {"status": hop.status_code, "url": hop.url, "location": hop.headers.get("Location", "")}

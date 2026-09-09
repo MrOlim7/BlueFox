@@ -1,110 +1,37 @@
-# Contributing to BlueFox — v2.5 beta
+# Contribuer aux fondations v3
 
-Thanks for your interest in improving BlueFox.
+Travaillez sur une branche et proposez une PR décrivant le problème, le comportement obtenu et les contrôles exécutés. Réservez les outils au diagnostic, à l’apprentissage et aux évaluations autorisées.
 
----
+## Environnement
 
-## Ground Rules
+Depuis le dépôt, créez `.venv`, puis utilisez son Python :
 
-- This project is **education and personal research only**.
-- Keep all contributions legal, ethical, and focused on defensive / security-learning workflows.
-- Avoid adding anything that explicitly facilitates abuse or unauthorized access.
-
----
-
-## How to Contribute
-
-1. Fork the repository.
-2. Create a feature branch:
-   - `feature/new-tool-name`
-   - `fix/social-lookup-timeout`
-   - `docs/update-macos-guide`
-3. Make focused changes.
-4. Test locally on your platform (Windows / Linux / macOS).
-5. Open a pull request with a clear description.
-
----
-
-## Development Setup
-
-**Windows:**
-```bat
-pip install -r requirements.txt
-python BlueFox.py
-```
-
-**Linux / macOS:**
-```bash
+```sh
 python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-python3 BlueFox.py
+.venv/bin/python -m pip install -e ".[full,dev]"
+.venv/bin/python -m pytest -q
+.venv/bin/python -m build
+bash -n start.sh
 ```
 
----
+Sous Windows, utilisez `py -3 -m venv .venv`, puis `.venv\Scripts\python.exe` pour les commandes Python ; le contrôle Bash est réservé aux systèmes POSIX. La CI cible Python 3.10–3.14 sur Linux/Windows/macOS. Un job configuré n’est pas une preuve d’exécution : indiquez ses résultats réels dans la PR.
 
-## Adding a New Tool
+## Migrer un outil
 
-1. Create `Program/tools/<tool_name>.py`
-2. Implement `run()` in that file:
-   ```python
-   from Program import legacy_tools as core
+1. Garder son ID dans `Program/catalogue.py` ; ne pas prendre son nom affiché comme identifiant.
+2. Implémenter une sous-classe `BaseTool` : pas de `input`, `print`, pause ou export imposé dans `run`. La saisie et la présentation appartiennent à l’UI.
+3. Remplacer `kind`, `module`, `entrypoint` de l’entrée existante, conserver ses catégories et documenter toute différence de comportement. Déclarer les dépendances requises/enrichissements dans le registre.
+4. Vérifier la conservation des entrées, traitements, données et erreurs avec des fixtures ; mettre à jour l’inventaire et le changelog. Une hausse du nombre d’outils ne prouve pas la conservation du catalogue.
+5. Conserver si nécessaire un wrapper interactif temporaire pour les anciens appelants. Ne pas étendre le monolithe et ne pas créer d’adaptateur fabriquant des données structurées à partir de stdout.
 
-   def run():
-       target = core.get_input("Target")
-       if not target:
-           return
-       core.print_header(f"MY TOOL - {target}")
-       # ... logic ...
-       core.ask_save(f"my_tool_{target}", data)
-   ```
-3. Register it in the correct category module (`Program/network.py`, `Program/osint.py`, etc.):
-   ```python
-   from .tools import my_tool
-   TOOLS = [
-       ...
-       ("My Tool", my_tool.run),
-   ]
-   ```
-4. Update `docs/PATCH_NOTES.md` under the next version section.
+Les listes `Program/<category>.py` sont désormais de simples interfaces de compatibilité. N’y ajouter aucun import d’outil : l’inventaire unique commande ces listes. Les doublons d’ID doivent produire une erreur et les imports cassés une entrée indisponible.
 
----
+## Configuration et tests
 
-## Coding Style
+Utiliser `Program.config.config`, sans copie des valeurs ni accès direct au JSON. `config.set` modifie la couche locale validée ; `set_overrides` réserve des valeurs à la session. Les chemins d’exports passent par `results_path`. Ne jamais persister une vue fusionnée des couches.
 
-- Keep code readable and simple.
-- Prefer explicit error handling (`try/except`) over silent failures.
-- Always set timeouts on external network requests.
-- Reuse shared helpers from `legacy_tools.py` (`print_result`, `print_success`, `ask_save`, etc.).
-- Use `core.get_input()` for all user prompts — not raw `input()`.
+Les tests utilisent une configuration temporaire. Les fixtures globales interdisent HTTP, DNS, sockets et commandes réelles. Simuler explicitement les transports nécessaires avec `monkeypatch`/`Mock`. Les tests qui lancent le CLI utilisent la fixture `process`, qui installe aussi un garde dans les enfants et signale toute tentative réseau, même si l’outil masque l’exception. Ne pas lancer de scan ou de recherche OSINT contre un tiers.
 
----
+Le test Windows de `setup.bat` simule un échec de pip ; les tests de lanceurs créent un vrai venv et réutilisent les dépendances déjà installées par un fichier `.pth`, sans téléchargement. La validation séparée d’une installation vierge depuis le wheel est consignée dans `VALIDATION.md`.
 
-## Platform Compatibility
-
-All tools must work on **Windows, Linux, and macOS**.
-
-- Use `platform.system()` to branch on OS-specific behavior.
-- Use Python's `socket`, `subprocess`, and `concurrent.futures` — avoid OS-specific shell commands in tool logic.
-- If a subprocess command differs by OS, check `platform.system() in ("Windows", "Darwin", ...)`.
-
----
-
-## Security and Safety
-
-- Do not commit secrets or private API keys.
-- Never commit `Program/bluefox_config.json` with real keys (it is already in `.gitignore`).
-- Do not commit Python cache folders (`__pycache__`).
-- Do not commit the `results/` folder.
-
----
-
-## Pull Request Checklist
-
-- [ ] Code runs locally (tested on at least one platform)
-- [ ] No obvious regressions in main menu / category navigation
-- [ ] Tool wired in the correct category module
-- [ ] `run()` function present and callable
-- [ ] `docs/PATCH_NOTES.md` updated with the change
-- [ ] No secrets or local cache files included
-- [ ] Timeouts on all network requests
+Le fichier utilisateur `Program/bluefox_config.json` a été retiré du suivi ; `.gitignore` ne retire jamais un fichier déjà suivi. Ne commitez ni clés, ni résultats, ni fichiers d’environnement. Utilisez `bluefox_config.example.json` sans secrets. Aucun historique Git ne doit être réécrit pour ce lot.

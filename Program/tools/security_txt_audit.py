@@ -12,7 +12,7 @@ def run():
     core.print_header(f"SECURITY.TXT AUDIT - {parsed.netloc}")
     data = {"url": url}
     try:
-        r = core.requests.get(url, timeout=10, headers={"User-Agent": "BlueFox/2.4"})
+        r = core.requests.get(url, timeout=10, headers={"User-Agent": f"BlueFox/{core.__version__}"})
         data["status_code"] = r.status_code
         data["length"] = len(r.text)
         if r.status_code == 200 and r.text.strip():

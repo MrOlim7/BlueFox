@@ -1,7 +1,2 @@
-requests
-pystyle
-python-whois
-dnspython
-beautifulsoup4
-Pillow
-pypresence
+# Metadata and dependency ranges have one source: pyproject.toml.
+.[full]

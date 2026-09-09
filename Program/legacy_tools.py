@@ -1,5 +1,5 @@
 # ============================================================
-#  BlueFox Tools V2.5 beta - OSINT Edition
+#  BlueFox historical tools — temporary v3 compatibility
 #  À but éducatif uniquement
 # ============================================================
 
@@ -64,48 +64,11 @@ except ImportError:
 # ============================================================
 #  CONFIG
 # ============================================================
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-CONFIG_FILE = os.path.join(BASE_DIR, "bluefox_config.json")
-API_KEY_FIELDS = {
-    "ipgeo_api_key": {
-        "label": "IPGeolocation",
-        "env": "IPGEO_API_KEY",
-    },
-    "abuseipdb_api_key": {
-        "label": "AbuseIPDB",
-        "env": "ABUSEIPDB_API_KEY",
-    },
-    "shodan_api_key": {
-        "label": "Shodan",
-        "env": "SHODAN_API_KEY",
-    },
-    "virustotal_api_key": {
-        "label": "VirusTotal",
-        "env": "VIRUSTOTAL_API_KEY",
-    },
-    "hunter_api_key": {
-        "label": "Hunter.io",
-        "env": "HUNTER_API_KEY",
-    },
-    "numverify_api_key": {
-        "label": "NumVerify",
-        "env": "NUMVERIFY_API_KEY",
-    },
-}
+from .config import API_KEY_FIELDS, CONFIG, CONFIG_FILE, config, mask_secret
+from .version import __version__
+from . import ui
 
-CONFIG = {
-    "version": "2.5 beta",
-    "client_id": "1305534641200959600",
-    "ui_theme": os.getenv("BLUEFOX_THEME", "blue"),
-    "ipgeo_api_key": os.getenv("IPGEO_API_KEY", ""),
-    "abuseipdb_api_key": os.getenv("ABUSEIPDB_API_KEY", ""),
-    "shodan_api_key": os.getenv("SHODAN_API_KEY", ""),
-    "virustotal_api_key": os.getenv("VIRUSTOTAL_API_KEY", ""),
-    "hunter_api_key": os.getenv("HUNTER_API_KEY", ""),
-    "numverify_api_key": os.getenv("NUMVERIFY_API_KEY", ""),
-    "results_folder": "results",
-    "max_workers": 200,
-}
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 THEME_PRESETS = {
     "blue": {"primary": "blue_to_cyan", "secondary": "blue_to_red"},
@@ -117,61 +80,11 @@ THEME_PRESETS = {
 
 
 def load_local_config():
-    if not os.path.exists(CONFIG_FILE):
-        return
-
-    try:
-        with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-            saved = json.load(f)
-    except Exception as e:
-        print_warning(f"Config locale ignorée: {e}")
-        return
-
-    for key in [
-        "ui_theme",
-        "ipgeo_api_key",
-        "abuseipdb_api_key",
-        "shodan_api_key",
-        "virustotal_api_key",
-        "hunter_api_key",
-        "numverify_api_key",
-        "results_folder",
-        "max_workers",
-    ]:
-        if key in saved and saved[key] not in [None, ""]:
-            CONFIG[key] = saved[key]
-
-    try:
-        CONFIG["max_workers"] = int(CONFIG["max_workers"])
-    except Exception:
-        CONFIG["max_workers"] = 200
+    return config.load()
 
 
 def save_local_config():
-    data = {
-        "version": CONFIG["version"],
-        "ui_theme": CONFIG.get("ui_theme", "blue"),
-        "results_folder": CONFIG["results_folder"],
-        "max_workers": CONFIG["max_workers"],
-    }
-    for key in API_KEY_FIELDS:
-        data[key] = CONFIG.get(key, "")
-
-    try:
-        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
-        return True
-    except Exception as e:
-        print_error(f"Impossible de sauvegarder la config: {e}")
-        return False
-
-
-def mask_secret(value):
-    if not value:
-        return "---"
-    if len(value) <= 8:
-        return "*" * len(value)
-    return f"{value[:4]}...{value[-4:]}"
+    return config.save()
 
 
 def set_ui_theme(theme_name):
@@ -197,54 +110,19 @@ def _theme_color_slot(slot, fallback_attr):
 # ============================================================
 #  COULEURS & AFFICHAGE
 # ============================================================
-def color(text):
-    if HAS_PYSTYLE:
-        palette = _theme_color_slot("primary", "blue_to_cyan")
-        if palette:
-            return Colorate.Horizontal(palette, text)
-    return text
-
-def color2(text):
-    if HAS_PYSTYLE:
-        palette = _theme_color_slot("secondary", "blue_to_red")
-        if palette:
-            return Colorate.Horizontal(palette, text)
-    return text
-
-def center(text):
-    if HAS_PYSTYLE:
-        return Center.XCenter(text)
-    return text
-
-def clear():
-    os.system('cls' if os.name == 'nt' else 'clear')
-
-def pause():
-    input(color("\n  [Appuie sur Entrée pour continuer...]"))
-
-def print_header(title):
-    print(color(f"\n  {'═' * 60}"))
-    print(color(f"  ║  {title}"))
-    print(color(f"  {'═' * 60}"))
-
-def print_result(key, value):
-    if value and value != "N/A":
-        print(color(f"  ║ {key:<25} : {value}"))
-
-def print_success(msg):
-    print(color(f"  [✓] {msg}"))
-
-def print_error(msg):
-    print(color2(f"  [✗] {msg}"))
-
-def print_info(msg):
-    print(color(f"  [i] {msg}"))
-
-def print_warning(msg):
-    print(color2(f"  [!] {msg}"))
-
-def get_input(prompt):
-    return input(color(f"  └─$ {prompt}: ")).strip()
+# Temporary UI aliases ensure both tool families use redaction and settings.
+color = ui.color
+color2 = ui.color
+center = ui.center
+clear = ui.clear
+pause = ui.pause
+print_header = ui.print_header
+print_result = ui.print_result
+print_success = ui.print_success
+print_error = ui.print_error
+print_info = ui.print_info
+print_warning = ui.print_warning
+get_input = ui.get_input
 
 
 def prompt_with_default(prompt, default=""):
@@ -290,7 +168,6 @@ def intro_animation():
     time.sleep(0.2)
 
 
-load_local_config()
 
 # ============================================================
 #  DISCORD RPC
@@ -339,7 +216,7 @@ atexit.register(close_rpc)
 #  SAUVEGARDE DES RÉSULTATS
 # ============================================================
 def ensure_results_folder():
-    os.makedirs(CONFIG["results_folder"], exist_ok=True)
+    os.makedirs(str(config.results_path()), exist_ok=True)
 
 def save_result(filename, data, fmt="json"):
     ensure_results_folder()
@@ -347,7 +224,7 @@ def save_result(filename, data, fmt="json"):
     safe_name = re.sub(r"[^A-Za-z0-9_.-]+", "_", str(filename)).strip("._")
     if not safe_name:
         safe_name = "result"
-    filepath = os.path.join(CONFIG["results_folder"], f"{safe_name}_{timestamp}.{fmt}")
+    filepath = os.path.join(str(config.results_path()), f"{safe_name}_{timestamp}.{fmt}")
     
     try:
         if fmt == "json":
@@ -870,7 +747,7 @@ def url_recon():
 
     print_header(f"URL RECON - {url}")
     headers_req = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) BlueFox/2.3"
+        "User-Agent": f"Mozilla/5.0 (Windows NT 10.0; Win64; x64) BlueFox/{__version__}"
     }
     data = {"url": url}
 
@@ -946,7 +823,7 @@ def robots_sitemap_audit():
 
     for label, file_url in paths.items():
         try:
-            r = requests.get(file_url, timeout=10, headers={"User-Agent": "BlueFox/2.3"})
+            r = requests.get(file_url, timeout=10, headers={"User-Agent": f"BlueFox/{__version__}"})
             exists = r.status_code < 400 and len(r.text.strip()) > 0
             data["files"][label] = {
                 "status_code": r.status_code,
@@ -2415,7 +2292,7 @@ def tech_stack_detector():
 def report_generator():
     print_header("RAPPORT D'INVESTIGATION")
     
-    results_dir = CONFIG["results_folder"]
+    results_dir = str(config.results_path())
     if not os.path.exists(results_dir):
         print_error("Aucun résultat sauvegardé trouvé")
         return
@@ -2456,7 +2333,7 @@ def report_generator():
     report = {
         "title": "BlueFox OSINT Investigation Report",
         "generated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "tool": f"BlueFox Tools v{CONFIG['version']}",
+        "tool": f"BlueFox Tools v{__version__}",
         "sections": []
     }
     
@@ -2519,7 +2396,7 @@ def report_generator():
 
 def list_saved_results():
     print_header("RÉSULTATS SAUVEGARDÉS")
-    results_dir = CONFIG["results_folder"]
+    results_dir = str(config.results_path())
     if not os.path.exists(results_dir):
         print_info("Aucun résultat sauvegardé")
         return

@@ -2,7 +2,7 @@
 
 ## Base et préservation du travail local
 
-Le 10 septembre 2026, la [PR #3](https://github.com/MrOlim7/BlueFox/pull/3) est ouverte en brouillon, sans fusion. Après `git fetch origin`, la branche locale et `origin/fix/v3-foundation` pointent sur `bc9e4a3207364dc023a4211e4b5c683d513bd4f6`. Le lot 2 part de ce commit sur `fix/v3-reliability`, dans le dossier initial BlueFox, sans nouveau worktree. Sa PR doit cibler `fix/v3-foundation` et dépend de #3.
+Le 10 septembre 2026, la [PR #3](https://github.com/MrOlim7/BlueFox/pull/3) est ouverte en brouillon, sans fusion. Après `git fetch origin`, la branche locale et `origin/fix/v3-foundation` pointent sur `bc9e4a3207364dc023a4211e4b5c683d513bd4f6`. Le lot 2 part de ce commit sur `fix/v3-reliability`, dans le dossier initial BlueFox, sans nouveau worktree. La [PR #4](https://github.com/MrOlim7/BlueFox/pull/4), créée en brouillon, cible `fix/v3-foundation` et dépend de #3.
 
 Les deux documents non suivis `BlueFox-v3-audit-et-prompt.md` et `BlueFox-v3-lot2-prompt.md` restent non suivis et leurs SHA-256 sont inchangés. Le stash `eb611b435929136df763c693150d1e3b94059153` n'a été ni appliqué ni supprimé. La sauvegarde existante `BlueFox-local-backup-20260910-191837` n'a pas été modifiée. Aucune fusion, release ou modification des réglages GitHub.
 
@@ -36,7 +36,15 @@ Les quatre nouveaux fichiers `tests/test_reliability_*.py` couvrent les risques 
 
 ## CI
 
-La matrice existante Linux/Windows/macOS × Python 3.10–3.14 est conservée. La validation distante de ce lot reste à consigner après publication de sa PR en brouillon ; les succès du lot 1 ne sont pas utilisés comme preuve du lot 2.
+La matrice existante Linux/Windows/macOS × Python 3.10–3.14 est conservée. Le [run 34509287470](https://github.com/MrOlim7/BlueFox/actions/runs/34509287470), déclenché sur la PR #4 pour le commit `299e13ad086310527ccf2a0eb8ce7ebfb2ea25ec`, est terminé avec **15/15 jobs réussis**. Les journaux des 15 jobs ont été lus :
+
+| Runner | Python | Pytest par version | Distributions |
+|---|---|---|---|
+| ubuntu-latest | 3.10, 3.11, 3.12, 3.13, 3.14 | 171 réussis, 1 ignoré | wheel + sdist réussis dans les 5 jobs |
+| windows-latest | 3.10, 3.11, 3.12, 3.13, 3.14 | 172 réussis, aucun ignoré | wheel + sdist réussis dans les 5 jobs |
+| macos-latest | 3.10, 3.11, 3.12, 3.13, 3.14 | 171 réussis, 1 ignoré | wheel + sdist réussis dans les 5 jobs |
+
+Le test réservé à Windows explique l'unique différence de compte. Cette preuve porte sur le code du lot 2, sans réutiliser les succès du lot 1. La présente consignation modifie uniquement la documentation ; la description de la PR indique aussi le contrôle du dernier commit publié.
 
 ## Limites et travail reporté
 

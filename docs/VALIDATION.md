@@ -1,5 +1,7 @@
 # Validation du lot 1
 
+Le bilan suivant reste celui des fondations. Les corrections métier suivantes sont consignées séparément dans [VALIDATION_LOT2.md](VALIDATION_LOT2.md).
+
 ## Référence revérifiée
 
 Le 9 septembre 2026, `main` local et `origin/main` pointaient tous deux sur `5bedac249cbffb3195955c194b6faad431780fa3` (v2.5.1). Aucune version plus récente que la préversion proposée n’apparaissait dans les tags examinés. Le répertoire initial contenait du travail non commité, notamment OSINT ; il a été conservé intact. Le lot a été réalisé dans le worktree séparé `BlueFox-foundation`, branche `fix/v3-foundation`, à partir du commit vérifié. Il ne mélange pas ces changements locaux à la PR.

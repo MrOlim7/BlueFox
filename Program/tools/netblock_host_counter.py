@@ -1,4 +1,5 @@
 import ipaddress
+from Program.reliability import host_bounds
 
 from Program import legacy_tools as core
 
@@ -16,9 +17,7 @@ def run():
         return
 
     hosts = network.num_addresses
-    usable = hosts - 2 if network.prefixlen < 31 else hosts
-    first = str(next(network.hosts())) if network.prefixlen < 31 else str(network.network_address)
-    last = str(list(network.hosts())[-1]) if network.prefixlen < 31 else str(network.broadcast_address)
+    usable, first, last = host_bounds(network)
 
     data = {
         "network": str(network.network_address),

@@ -67,6 +67,7 @@ except ImportError:
 from .config import API_KEY_FIELDS, CONFIG, CONFIG_FILE, config, mask_secret
 from .version import __version__
 from . import ui
+from .reliability import response_object, host_bounds, port_range, parse_ports
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -123,6 +124,7 @@ print_error = ui.print_error
 print_info = ui.print_info
 print_warning = ui.print_warning
 get_input = ui.get_input
+get_secret = ui.get_secret
 
 
 def prompt_with_default(prompt, default=""):
@@ -293,54 +295,15 @@ def ip_lookup():
     update_rpc("IP Lookup", f"Recherche {ip}")
     print_header(f"IP INFORMATION - {ip}")
     
-    try:
-        # Essai avec ip-api.com (gratuit, pas de clé)
-        response = requests.get(f"http://ip-api.com/json/{ip}?fields=66846719", timeout=10).json()
-        
-        if response.get("status") == "fail":
-            print_error(f"Erreur: {response.get('message')}")
-            return
-        
-        data = {
-            "IP": ip,
-            "Pays": f"{response.get('country', 'N/A')} ({response.get('countryCode', '')})",
-            "Région": response.get("regionName", "N/A"),
-            "Ville": response.get("city", "N/A"),
-            "Code Postal": response.get("zip", "N/A"),
-            "Latitude": response.get("lat", "N/A"),
-            "Longitude": response.get("lon", "N/A"),
-            "Timezone": response.get("timezone", "N/A"),
-            "ISP": response.get("isp", "N/A"),
-            "Organisation": response.get("org", "N/A"),
-            "AS": response.get("as", "N/A"),
-            "Mobile": response.get("mobile", "N/A"),
-            "Proxy/VPN": response.get("proxy", "N/A"),
-            "Hosting": response.get("hosting", "N/A"),
-        }
-        
-        for k, v in data.items():
-            print_result(k, str(v))
-        
-        # Essai enrichissement avec ipgeo si clé dispo
-        if CONFIG["ipgeo_api_key"]:
-            try:
-                r2 = requests.get(
-                    f"https://api.ipgeolocation.io/ipgeo?apiKey={CONFIG['ipgeo_api_key']}&ip={ip}",
-                    timeout=10
-                ).json()
-                if r2.get("continent_name"):
-                    print_result("Continent", r2.get("continent_name"))
-                if r2.get("district"):
-                    print_result("District", r2.get("district"))
-                if r2.get("currency") and isinstance(r2["currency"], dict):
-                    print_result("Monnaie", r2["currency"].get("name"))
-            except:
-                pass
-        
-        ask_save(f"ip_lookup_{ip}", data)
-        
-    except Exception as e:
-        print_error(f"Erreur: {e}")
+    from .tools.ip_lookup import IPLookupTool
+    result = IPLookupTool().run(ip=ip)
+    if not result["success"]:
+        print_error(result["error"])
+        return
+    for key, value in result["data"].items():
+        print_result(key, str(value))
+    ask_save(f"ip_lookup_{ip}", result["data"])
+
 
 def traceroute():
     ip = get_input("Adresse IP/Domaine")
@@ -410,9 +373,11 @@ def port_scanner():
     elif mode == "3":
         ports = list(range(1, 65536))
     elif mode == "4":
-        start = int(get_input("Port début"))
-        end = int(get_input("Port fin"))
-        ports = list(range(start, end + 1))
+        try:
+            ports = port_range(get_input("Port début"), get_input("Port fin"))
+        except ValueError as exc:
+            print_error(str(exc))
+            return
     else:
         ports = TOP_100
     
@@ -671,15 +636,16 @@ def subnet_calculator():
     try:
         import ipaddress
         network = ipaddress.ip_network(cidr, strict=False)
+        usable, first, last = host_bounds(network)
         data = {
             "Adresse réseau": str(network.network_address),
             "Broadcast": str(network.broadcast_address),
             "Masque": str(network.netmask),
             "Wildcard": str(network.hostmask),
             "Préfixe": f"/{network.prefixlen}",
-            "Nombre d'hôtes": network.num_addresses - 2 if network.prefixlen < 31 else network.num_addresses,
-            "Première IP": str(list(network.hosts())[0]) if network.prefixlen < 31 else "N/A",
-            "Dernière IP": str(list(network.hosts())[-1]) if network.prefixlen < 31 else "N/A",
+            "Nombre d'hôtes": usable,
+            "Première IP": first,
+            "Dernière IP": last,
             "Privé": str(network.is_private),
         }
         for k, v in data.items():
@@ -698,20 +664,10 @@ def tcp_connect_test():
     if not raw_ports:
         return
 
-    ports = []
-    for part in raw_ports.replace(" ", "").split(","):
-        if "-" in part:
-            try:
-                start, end = part.split("-", 1)
-                ports.extend(range(int(start), int(end) + 1))
-            except ValueError:
-                continue
-        elif part.isdigit():
-            ports.append(int(part))
-
-    ports = sorted(set(p for p in ports if 1 <= p <= 65535))
-    if not ports:
-        print_error("Aucun port valide fourni")
+    try:
+        ports = parse_ports(raw_ports)
+    except ValueError as exc:
+        print_error(f"Ports invalides : {exc}")
         return
 
     print_header(f"TCP CONNECT TEST - {host}")
@@ -1738,7 +1694,7 @@ def social_media_lookup():
                    "page not found" in lower_text or "user not found" in lower_text or \
                    "no results" in lower_text or "404" in r.url:
                     return ("not_found", name, url)
-                return ("found", name, url)
+                return ("possible", name, url)
             elif r.status_code == 404:
                 return ("not_found", name, url)
             else:
@@ -1765,35 +1721,41 @@ def social_media_lookup():
             
             try:
                 status, name, url = future.result()
-                if status == "found":
+                if status == "possible":
                     found.append((name, url))
                 elif status == "not_found":
                     not_found.append(name)
                 else:
                     errors.append(name)
-            except:
-                pass
+            except Exception:
+                errors.append(futures[future])
     
     # Résultats
     print(color(f"\n\n  {'═' * 60}"))
-    print_success(f"RÉSULTATS POUR: {username}")
+    print_info(f"RÉSULTATS POUR: {username}")
     print(color(f"  {'═' * 60}\n"))
     
     if found:
-        print_success(f"Profils potentiellement trouvés ({len(found)}):\n")
+        print_info(f"Profils possibles ({len(found)}):\n")
         for name, url in sorted(found):
             print(color(f"  ✓ {name:<20} → {url}"))
     
     print(color(f"\n  {'─' * 40}"))
-    print_info(f"Non trouvé: {len(not_found)} | Erreurs: {len(errors)}")
-    
-    if found:
-        data = {
-            "username": username,
-            "found_count": len(found),
-            "profiles": {name: url for name, url in found},
-            "not_found_count": len(not_found),
-        }
+    print_info(f"Absence apparente: {len(not_found)} | Erreurs: {len(errors)}")
+
+    print_warning("HTTP 200 ne prouve ni l'existence d'un profil ni une identité")
+    data = {
+        "username": username,
+        "found_count": len(found),
+        "profiles": {name: url for name, url in sorted(found)},
+        "profile_status": "possible",
+        "not_found_count": len(not_found),
+        "not_found": sorted(not_found),
+        "error_count": len(errors),
+        "errors": sorted(errors),
+        "status": "partial" if errors else "completed",
+        "interpretation": "Profils possibles et absences apparentes ; aucune identité confirmée",
+    }
     ask_save(f"social_{raw_username}", data)
 
 def email_osint():
@@ -2053,30 +2015,31 @@ def virustotal_check():
         if mode == "1":
             url = get_input("URL à vérifier")
             url_id = base64.urlsafe_b64encode(url.encode()).decode().strip("=")
-            r = requests.get(f"https://www.virustotal.com/api/v3/urls/{url_id}", headers=headers, timeout=15).json()
-            attrs = r.get("data", {}).get("attributes", {})
-            stats = attrs.get("last_analysis_stats", {})
+            r = requests.get(f"https://www.virustotal.com/api/v3/urls/{url_id}", headers=headers, timeout=15)
             
         elif mode == "2":
             domain = get_input("Domaine")
-            r = requests.get(f"https://www.virustotal.com/api/v3/domains/{domain}", headers=headers, timeout=15).json()
-            attrs = r.get("data", {}).get("attributes", {})
-            stats = attrs.get("last_analysis_stats", {})
+            r = requests.get(f"https://www.virustotal.com/api/v3/domains/{domain}", headers=headers, timeout=15)
             
         elif mode == "3":
             ip = get_input("Adresse IP")
-            r = requests.get(f"https://www.virustotal.com/api/v3/ip_addresses/{ip}", headers=headers, timeout=15).json()
-            attrs = r.get("data", {}).get("attributes", {})
-            stats = attrs.get("last_analysis_stats", {})
+            r = requests.get(f"https://www.virustotal.com/api/v3/ip_addresses/{ip}", headers=headers, timeout=15)
             
         elif mode == "4":
             file_hash = get_input("Hash (MD5/SHA1/SHA256)")
-            r = requests.get(f"https://www.virustotal.com/api/v3/files/{file_hash}", headers=headers, timeout=15).json()
-            attrs = r.get("data", {}).get("attributes", {})
-            stats = attrs.get("last_analysis_stats", {})
+            r = requests.get(f"https://www.virustotal.com/api/v3/files/{file_hash}", headers=headers, timeout=15)
         else:
             return
         
+        payload = response_object(r, "VirusTotal")
+        obj = payload.get("data")
+        attrs = obj.get("attributes") if isinstance(obj, dict) else None
+        stats = attrs.get("last_analysis_stats") if isinstance(attrs, dict) else None
+        required = ("malicious", "suspicious", "harmless", "undetected")
+        if (not isinstance(stats, dict) or not all(key in stats for key in required)
+                or any(type(value) is not int or value < 0 for value in stats.values())
+                or sum(stats[key] for key in required) == 0):
+            raise ValueError("VirusTotal: analyse absente, incomplète ou indisponible")
         data = {
             "Malicious": stats.get("malicious", 0),
             "Suspicious": stats.get("suspicious", 0),
@@ -2091,9 +2054,12 @@ def virustotal_check():
         if stats.get("malicious", 0) > 0:
             print_warning(f"⚠ DÉTECTÉ COMME MALVEILLANT PAR {stats['malicious']} MOTEURS!")
         else:
-            print_success("✓ Aucune détection malveillante")
+            print_info("Aucune détection malveillante dans cette analyse ; aucune garantie de sécurité")
         
+        data["Interpretation"] = "Statistiques de cette analyse uniquement ; aucune garantie de sécurité"
         ask_save("virustotal", data)
+    except requests.RequestException:
+        print_error("VirusTotal: erreur réseau, résultat indisponible")
     except Exception as e:
         print_error(f"Erreur: {e}")
 

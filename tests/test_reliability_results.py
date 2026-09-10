@@ -139,3 +139,27 @@ def test_social_empty_errors_and_possible_are_exportable(monkeypatch, capsys, st
     assert sum(data[k] for k in ("found_count", "not_found_count", "error_count")) == data[category]
     assert data["profile_status"] == "possible"
     assert "ne prouve" in capsys.readouterr().out
+
+
+def test_social_timeouts_are_exportable(monkeypatch):
+    monkeypatch.setattr(core, "get_input", lambda _: "fixture")
+    monkeypatch.setattr(requests, "get", Mock(side_effect=requests.Timeout))
+    save = Mock()
+    monkeypatch.setattr(core, "ask_save", save)
+    core.social_media_lookup()
+    data = save.call_args.args[1]
+    assert data["error_count"] > 0 and data["found_count"] == 0 and data["profiles"] == {}
+
+
+@pytest.mark.parametrize("payload", [None, [], {}, {"data": None},
+                                      {"data": {"attributes": []}}, {"error": {"code": "NotFoundError"}}])
+def test_vt_invalid_outer_schema(monkeypatch, capsys, payload):
+    config.set("virustotal_api_key", "fixture")
+    monkeypatch.setattr(requests, "get", Mock(return_value=response(payload)))
+    answers = iter(["2", "example.org"])
+    monkeypatch.setattr(core, "get_input", lambda _: next(answers))
+    save = Mock()
+    monkeypatch.setattr(core, "ask_save", save)
+    core.virustotal_check()
+    assert "Aucune détection" not in capsys.readouterr().out
+    save.assert_not_called()

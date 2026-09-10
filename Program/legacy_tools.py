@@ -68,6 +68,7 @@ from .config import API_KEY_FIELDS, CONFIG, CONFIG_FILE, config, mask_secret
 from .version import __version__
 from . import ui
 from .reliability import response_object, host_bounds, port_range, parse_ports
+from .result_storage import write_result, is_report, report_text
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -221,49 +222,29 @@ def ensure_results_folder():
     os.makedirs(str(config.results_path()), exist_ok=True)
 
 def save_result(filename, data, fmt="json"):
-    ensure_results_folder()
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    safe_name = re.sub(r"[^A-Za-z0-9_.-]+", "_", str(filename)).strip("._")
-    if not safe_name:
-        safe_name = "result"
-    filepath = os.path.join(str(config.results_path()), f"{safe_name}_{timestamp}.{fmt}")
-    
     try:
-        if fmt == "json":
-            with open(filepath, "w", encoding="utf-8") as f:
-                json.dump(data, f, indent=4, ensure_ascii=False, default=str)
-        elif fmt == "csv":
-            with open(filepath, "w", newline="", encoding="utf-8") as f:
-                writer = csv.writer(f)
-                if isinstance(data, dict):
-                    writer.writerow(["Key", "Value"])
-                    for k, v in data.items():
-                        writer.writerow([k, v])
-                elif isinstance(data, list):
-                    for row in data:
-                        writer.writerow(row) if isinstance(row, list) else writer.writerow([row])
-        elif fmt == "txt":
-            with open(filepath, "w", encoding="utf-8") as f:
-                if isinstance(data, dict):
-                    for k, v in data.items():
-                        f.write(f"{k}: {v}\n")
-                else:
-                    f.write(str(data))
-        
-        print_success(f"Résultat sauvegardé: {filepath}")
-        return filepath
-    except Exception as e:
-        print_error(f"Erreur sauvegarde: {e}")
+        filepath = write_result(config.results_path(), filename, data, fmt)
+    except (OSError, ValueError, TypeError) as exc:
+        print_error(f"Erreur sauvegarde: {exc}")
         return None
+    print_success(f"Résultat sauvegardé: {filepath}")
+    return filepath
+
 
 def ask_save(filename, data):
     choice = get_input("Sauvegarder les résultats? (json/csv/txt/non)")
     if choice in ["json", "csv", "txt"]:
         save_result(filename, data, choice)
+    elif choice not in ("", "non", "no", "n"):
+        print_error(f"Format d'export inconnu : {choice}")
 
 def ask_export_format():
     choice = get_input("Format d'export (json/csv/txt/non)")
-    return choice if choice in ["json", "csv", "txt"] else None
+    if choice in ["json", "csv", "txt"]:
+        return choice
+    if choice not in ("", "non", "no", "n"):
+        print_error(f"Format d'export inconnu : {choice}")
+    return None
 
 # ============================================================
 #  CATÉGORIE 1 : NETWORK TOOLS
@@ -1558,7 +1539,8 @@ def haveibeenpwned():
                 print_warning("⚠ Cette adresse a été trouvée dans des fuites de données!")
                 for breach in result.get("result", []):
                     print_result("Source", breach.get("source", "N/A"))
-                    data["breaches"].append(breach)
+                    # Provider payloads can contain passwords/hashes: retain source only.
+                    data["breaches"].append({"source": breach.get("source", "N/A")})
     except:
         pass
     
@@ -1571,29 +1553,21 @@ def haveibeenpwned():
     print(color(f"\n  {'─' * 40}"))
     check_pass = get_input("Vérifier aussi un mot de passe? (oui/non)")
     if check_pass.lower() in ["oui", "o", "yes", "y"]:
-        password = get_input("Mot de passe à vérifier")
+        password = get_secret("Mot de passe à vérifier")
         if password:
-            sha1_hash = hashlib.sha1(password.encode()).hexdigest().upper()
-            prefix = sha1_hash[:5]
-            suffix = sha1_hash[5:]
-            
+            from .passwords import pwned_count
             try:
-                r = requests.get(f"https://api.pwnedpasswords.com/range/{prefix}", timeout=10)
-                if r.status_code == 200:
-                    found = False
-                    for line in r.text.splitlines():
-                        hash_suffix, count = line.split(":")
-                        if hash_suffix == suffix:
-                            print_warning(f"⚠ Ce mot de passe a été trouvé {count} fois dans des fuites!")
-                            data["password_pwned"] = True
-                            data["password_count"] = int(count)
-                            found = True
-                            break
-                    if not found:
-                        print_success("✓ Ce mot de passe n'a pas été trouvé dans les fuites connues")
-                        data["password_pwned"] = False
-            except Exception as e:
-                print_error(f"Erreur: {e}")
+                count = pwned_count(password)
+                data["password_pwned"] = count > 0
+                data["password_count"] = count
+                if count:
+                    print_warning(f"Ce mot de passe apparaît {count} fois dans les fuites connues")
+                else:
+                    print_info("Mot de passe absent de cette réponse ; aucune garantie de sécurité")
+            except (requests.RequestException, ValueError):
+                # Do not echo transport payloads or secret-derived values.
+                data["password_status"] = "unavailable"
+                print_error("Pwned Passwords: résultat indisponible")
     
     # 4. Liens utiles
     print(color(f"\n  {'─' * 40}"))
@@ -2263,7 +2237,9 @@ def report_generator():
         print_error("Aucun résultat sauvegardé trouvé")
         return
     
-    files = [f for f in os.listdir(results_dir) if f.endswith('.json')]
+    files = sorted(f for f in os.listdir(results_dir)
+                   if f.endswith('.json') and not f.upper().startswith('REPORT_')
+                   and os.path.isfile(os.path.join(results_dir, f)))
     if not files:
         print_error("Aucun fichier JSON trouvé dans les résultats")
         return
@@ -2298,6 +2274,7 @@ def report_generator():
     # Construire le rapport
     report = {
         "title": "BlueFox OSINT Investigation Report",
+        "report_kind": "bluefox_investigation",
         "generated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "tool": f"BlueFox Tools v{__version__}",
         "sections": []
@@ -2307,54 +2284,23 @@ def report_generator():
         try:
             with open(os.path.join(results_dir, f), "r", encoding="utf-8") as fp:
                 content = json.load(fp)
+                if is_report(content):
+                    print_warning(f"Rapport déjà généré ignoré : {f}")
+                    continue
                 report["sections"].append({
                     "source_file": f,
                     "data": content
                 })
-        except:
-            pass
-    
-    # Sauvegarde du rapport
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    
-    # JSON
-    report_path = os.path.join(results_dir, f"REPORT_{timestamp}.json")
-    with open(report_path, "w", encoding="utf-8") as f:
-        json.dump(report, f, indent=4, ensure_ascii=False, default=str)
-    print_success(f"Rapport JSON: {report_path}")
-    
-    # TXT lisible
-    txt_path = os.path.join(results_dir, f"REPORT_{timestamp}.txt")
-    with open(txt_path, "w", encoding="utf-8") as f:
-        f.write("=" * 60 + "\n")
-        f.write("  BLUEFOX OSINT INVESTIGATION REPORT\n")
-        f.write(f"  Généré: {report['generated']}\n")
-        f.write(f"  Outil: {report['tool']}\n")
-        f.write("=" * 60 + "\n\n")
-        
-        for section in report["sections"]:
-            f.write(f"\n{'─' * 60}\n")
-            f.write(f"  SOURCE: {section['source_file']}\n")
-            f.write(f"{'─' * 60}\n\n")
-            
-            def write_dict(d, indent=2):
-                for k, v in d.items():
-                    if isinstance(v, dict):
-                        f.write(f"{' ' * indent}{k}:\n")
-                        write_dict(v, indent + 4)
-                    elif isinstance(v, list):
-                        f.write(f"{' ' * indent}{k}:\n")
-                        for item in v:
-                            if isinstance(item, dict):
-                                write_dict(item, indent + 4)
-                            else:
-                                f.write(f"{' ' * (indent+4)}- {item}\n")
-                    else:
-                        f.write(f"{' ' * indent}{k}: {v}\n")
-            
-            write_dict(section["data"])
-    
-    print_success(f"Rapport TXT: {txt_path}")
+        except (OSError, ValueError) as exc:
+            print_error(f"Source illisible {f}: {exc}. Rapport annulé")
+            return
+
+    if not report["sections"]:
+        print_error("Aucune source exploitable ; rapport annulé")
+        return
+    if save_result("REPORT", report, "json") is None:
+        return
+    save_result("REPORT", report_text(report), "txt")
 
 # ============================================================
 #  SYSTÈME DE MENUS

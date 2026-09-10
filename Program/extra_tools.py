@@ -1,6 +1,8 @@
 import concurrent.futures
 import hashlib
 import ipaddress
+from itertools import islice
+from .reliability import host_bounds
 import os
 import socket
 import subprocess
@@ -208,9 +210,9 @@ def ping_sweep_cidr():
         core.print_error(f"CIDR invalide: {e}")
         return
 
-    hosts = list(network.hosts())
-    if len(hosts) > 256:
-        hosts = hosts[:256]
+    count, _, _ = host_bounds(network)
+    hosts = list(islice(network.hosts(), 256))
+    if count > 256:
         core.print_warning("Limite appliquée à 256 hôtes pour garder l'outil réactif")
 
     data = {"cidr": cidr, "alive": []}

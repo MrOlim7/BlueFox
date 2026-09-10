@@ -1,5 +1,16 @@
 # BlueFox Patch Notes
 
+## Lot 2 — fiabilité, préversion non publiée
+
+- VirusTotal valide HTTP, JSON et statistiques avant interprétation ; analyse absente distincte de zéro détection, sans garantie de sécurité.
+- IP Lookup partage la validation entre le moteur et le chemin historique ; schémas incomplets refusés ou signalés comme partiels, enrichissement facultatif indisponible explicite.
+- Social lookup exporte aussi les absences apparentes et erreurs ; les HTTP 200 restent des profils possibles, sans confirmation d'identité.
+- Calculs CIDR sans énumération, cas IPv4 /31–/32 et IPv6 /127–/128 corrigés ; sweep limité avant consommation à 256 hôtes ; bornes des ports validées avant matérialisation.
+- IOC validés avec `ipaddress`, IPv6 reconnu, hôtes des URL analysés sans identifiants/port pour les liens ; types, valeurs et liens conservés dans les exports.
+- Exports JSON/CSV/TXT publiés complets sous noms uniques, sans écrasement concurrent ; erreurs remontées, formats inconnus refusés, cellules CSV à risque préfixées par une apostrophe. Rapports précédents exclus des sources, sources illisibles signalées.
+- Saisie masquée commune des mots de passe avec espaces conservés ; Pwned Passwords transmet seulement les cinq caractères du préfixe SHA-1 ; aucun secret saisi ni hash complet de mot de passe affiché/exporté. Les charges de BreachDirectory sont limitées au champ source dans l'export. Score de robustesse présenté comme estimation limitée.
+- Validation locale Linux Python 3.12.3 : **171 tests réussis, 1 ignoré**, construction wheel/sdist, contrôle des dépendances et syntaxe Bash réussis. Matrice CI de 15 environnements conservée et **15/15 jobs réussis** (172 tests sous Windows, 171 réussis/1 ignoré sous Linux/macOS) ; preuves et limites dans [VALIDATION_LOT2.md](VALIDATION_LOT2.md).
+
 ## 3.0.0a1 — fondations v3, non publiée
 
 - Répare les imports, les menus, réglages, Ctrl+C/EOF et ajoute aide/version/démarrage rapide sans attente.

@@ -67,6 +67,8 @@ except ImportError:
 from .config import API_KEY_FIELDS, CONFIG, CONFIG_FILE, config, mask_secret
 from .version import __version__
 from . import ui
+from .reliability import response_object, host_bounds, port_range, parse_ports
+from .result_storage import write_result, is_report, report_text
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -123,6 +125,7 @@ print_error = ui.print_error
 print_info = ui.print_info
 print_warning = ui.print_warning
 get_input = ui.get_input
+get_secret = ui.get_secret
 
 
 def prompt_with_default(prompt, default=""):
@@ -219,49 +222,29 @@ def ensure_results_folder():
     os.makedirs(str(config.results_path()), exist_ok=True)
 
 def save_result(filename, data, fmt="json"):
-    ensure_results_folder()
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    safe_name = re.sub(r"[^A-Za-z0-9_.-]+", "_", str(filename)).strip("._")
-    if not safe_name:
-        safe_name = "result"
-    filepath = os.path.join(str(config.results_path()), f"{safe_name}_{timestamp}.{fmt}")
-    
     try:
-        if fmt == "json":
-            with open(filepath, "w", encoding="utf-8") as f:
-                json.dump(data, f, indent=4, ensure_ascii=False, default=str)
-        elif fmt == "csv":
-            with open(filepath, "w", newline="", encoding="utf-8") as f:
-                writer = csv.writer(f)
-                if isinstance(data, dict):
-                    writer.writerow(["Key", "Value"])
-                    for k, v in data.items():
-                        writer.writerow([k, v])
-                elif isinstance(data, list):
-                    for row in data:
-                        writer.writerow(row) if isinstance(row, list) else writer.writerow([row])
-        elif fmt == "txt":
-            with open(filepath, "w", encoding="utf-8") as f:
-                if isinstance(data, dict):
-                    for k, v in data.items():
-                        f.write(f"{k}: {v}\n")
-                else:
-                    f.write(str(data))
-        
-        print_success(f"Résultat sauvegardé: {filepath}")
-        return filepath
-    except Exception as e:
-        print_error(f"Erreur sauvegarde: {e}")
+        filepath = write_result(config.results_path(), filename, data, fmt)
+    except (OSError, ValueError, TypeError) as exc:
+        print_error(f"Erreur sauvegarde: {exc}")
         return None
+    print_success(f"Résultat sauvegardé: {filepath}")
+    return filepath
+
 
 def ask_save(filename, data):
     choice = get_input("Sauvegarder les résultats? (json/csv/txt/non)")
     if choice in ["json", "csv", "txt"]:
         save_result(filename, data, choice)
+    elif choice not in ("", "non", "no", "n"):
+        print_error(f"Format d'export inconnu : {choice}")
 
 def ask_export_format():
     choice = get_input("Format d'export (json/csv/txt/non)")
-    return choice if choice in ["json", "csv", "txt"] else None
+    if choice in ["json", "csv", "txt"]:
+        return choice
+    if choice not in ("", "non", "no", "n"):
+        print_error(f"Format d'export inconnu : {choice}")
+    return None
 
 # ============================================================
 #  CATÉGORIE 1 : NETWORK TOOLS
@@ -293,54 +276,15 @@ def ip_lookup():
     update_rpc("IP Lookup", f"Recherche {ip}")
     print_header(f"IP INFORMATION - {ip}")
     
-    try:
-        # Essai avec ip-api.com (gratuit, pas de clé)
-        response = requests.get(f"http://ip-api.com/json/{ip}?fields=66846719", timeout=10).json()
-        
-        if response.get("status") == "fail":
-            print_error(f"Erreur: {response.get('message')}")
-            return
-        
-        data = {
-            "IP": ip,
-            "Pays": f"{response.get('country', 'N/A')} ({response.get('countryCode', '')})",
-            "Région": response.get("regionName", "N/A"),
-            "Ville": response.get("city", "N/A"),
-            "Code Postal": response.get("zip", "N/A"),
-            "Latitude": response.get("lat", "N/A"),
-            "Longitude": response.get("lon", "N/A"),
-            "Timezone": response.get("timezone", "N/A"),
-            "ISP": response.get("isp", "N/A"),
-            "Organisation": response.get("org", "N/A"),
-            "AS": response.get("as", "N/A"),
-            "Mobile": response.get("mobile", "N/A"),
-            "Proxy/VPN": response.get("proxy", "N/A"),
-            "Hosting": response.get("hosting", "N/A"),
-        }
-        
-        for k, v in data.items():
-            print_result(k, str(v))
-        
-        # Essai enrichissement avec ipgeo si clé dispo
-        if CONFIG["ipgeo_api_key"]:
-            try:
-                r2 = requests.get(
-                    f"https://api.ipgeolocation.io/ipgeo?apiKey={CONFIG['ipgeo_api_key']}&ip={ip}",
-                    timeout=10
-                ).json()
-                if r2.get("continent_name"):
-                    print_result("Continent", r2.get("continent_name"))
-                if r2.get("district"):
-                    print_result("District", r2.get("district"))
-                if r2.get("currency") and isinstance(r2["currency"], dict):
-                    print_result("Monnaie", r2["currency"].get("name"))
-            except:
-                pass
-        
-        ask_save(f"ip_lookup_{ip}", data)
-        
-    except Exception as e:
-        print_error(f"Erreur: {e}")
+    from .tools.ip_lookup import IPLookupTool
+    result = IPLookupTool().run(ip=ip)
+    if not result["success"]:
+        print_error(result["error"])
+        return
+    for key, value in result["data"].items():
+        print_result(key, str(value))
+    ask_save(f"ip_lookup_{ip}", result["data"])
+
 
 def traceroute():
     ip = get_input("Adresse IP/Domaine")
@@ -410,9 +354,11 @@ def port_scanner():
     elif mode == "3":
         ports = list(range(1, 65536))
     elif mode == "4":
-        start = int(get_input("Port début"))
-        end = int(get_input("Port fin"))
-        ports = list(range(start, end + 1))
+        try:
+            ports = port_range(get_input("Port début"), get_input("Port fin"))
+        except ValueError as exc:
+            print_error(str(exc))
+            return
     else:
         ports = TOP_100
     
@@ -671,15 +617,16 @@ def subnet_calculator():
     try:
         import ipaddress
         network = ipaddress.ip_network(cidr, strict=False)
+        usable, first, last = host_bounds(network)
         data = {
             "Adresse réseau": str(network.network_address),
             "Broadcast": str(network.broadcast_address),
             "Masque": str(network.netmask),
             "Wildcard": str(network.hostmask),
             "Préfixe": f"/{network.prefixlen}",
-            "Nombre d'hôtes": network.num_addresses - 2 if network.prefixlen < 31 else network.num_addresses,
-            "Première IP": str(list(network.hosts())[0]) if network.prefixlen < 31 else "N/A",
-            "Dernière IP": str(list(network.hosts())[-1]) if network.prefixlen < 31 else "N/A",
+            "Nombre d'hôtes": usable,
+            "Première IP": first,
+            "Dernière IP": last,
             "Privé": str(network.is_private),
         }
         for k, v in data.items():
@@ -698,20 +645,10 @@ def tcp_connect_test():
     if not raw_ports:
         return
 
-    ports = []
-    for part in raw_ports.replace(" ", "").split(","):
-        if "-" in part:
-            try:
-                start, end = part.split("-", 1)
-                ports.extend(range(int(start), int(end) + 1))
-            except ValueError:
-                continue
-        elif part.isdigit():
-            ports.append(int(part))
-
-    ports = sorted(set(p for p in ports if 1 <= p <= 65535))
-    if not ports:
-        print_error("Aucun port valide fourni")
+    try:
+        ports = parse_ports(raw_ports)
+    except ValueError as exc:
+        print_error(f"Ports invalides : {exc}")
         return
 
     print_header(f"TCP CONNECT TEST - {host}")
@@ -1602,7 +1539,8 @@ def haveibeenpwned():
                 print_warning("⚠ Cette adresse a été trouvée dans des fuites de données!")
                 for breach in result.get("result", []):
                     print_result("Source", breach.get("source", "N/A"))
-                    data["breaches"].append(breach)
+                    # Provider payloads can contain passwords/hashes: retain source only.
+                    data["breaches"].append({"source": breach.get("source", "N/A")})
     except:
         pass
     
@@ -1615,29 +1553,21 @@ def haveibeenpwned():
     print(color(f"\n  {'─' * 40}"))
     check_pass = get_input("Vérifier aussi un mot de passe? (oui/non)")
     if check_pass.lower() in ["oui", "o", "yes", "y"]:
-        password = get_input("Mot de passe à vérifier")
+        password = get_secret("Mot de passe à vérifier")
         if password:
-            sha1_hash = hashlib.sha1(password.encode()).hexdigest().upper()
-            prefix = sha1_hash[:5]
-            suffix = sha1_hash[5:]
-            
+            from .passwords import pwned_count
             try:
-                r = requests.get(f"https://api.pwnedpasswords.com/range/{prefix}", timeout=10)
-                if r.status_code == 200:
-                    found = False
-                    for line in r.text.splitlines():
-                        hash_suffix, count = line.split(":")
-                        if hash_suffix == suffix:
-                            print_warning(f"⚠ Ce mot de passe a été trouvé {count} fois dans des fuites!")
-                            data["password_pwned"] = True
-                            data["password_count"] = int(count)
-                            found = True
-                            break
-                    if not found:
-                        print_success("✓ Ce mot de passe n'a pas été trouvé dans les fuites connues")
-                        data["password_pwned"] = False
-            except Exception as e:
-                print_error(f"Erreur: {e}")
+                count = pwned_count(password)
+                data["password_pwned"] = count > 0
+                data["password_count"] = count
+                if count:
+                    print_warning(f"Ce mot de passe apparaît {count} fois dans les fuites connues")
+                else:
+                    print_info("Mot de passe absent de cette réponse ; aucune garantie de sécurité")
+            except (requests.RequestException, ValueError):
+                # Do not echo transport payloads or secret-derived values.
+                data["password_status"] = "unavailable"
+                print_error("Pwned Passwords: résultat indisponible")
     
     # 4. Liens utiles
     print(color(f"\n  {'─' * 40}"))
@@ -1738,7 +1668,7 @@ def social_media_lookup():
                    "page not found" in lower_text or "user not found" in lower_text or \
                    "no results" in lower_text or "404" in r.url:
                     return ("not_found", name, url)
-                return ("found", name, url)
+                return ("possible", name, url)
             elif r.status_code == 404:
                 return ("not_found", name, url)
             else:
@@ -1765,35 +1695,41 @@ def social_media_lookup():
             
             try:
                 status, name, url = future.result()
-                if status == "found":
+                if status == "possible":
                     found.append((name, url))
                 elif status == "not_found":
                     not_found.append(name)
                 else:
                     errors.append(name)
-            except:
-                pass
+            except Exception:
+                errors.append(futures[future])
     
     # Résultats
     print(color(f"\n\n  {'═' * 60}"))
-    print_success(f"RÉSULTATS POUR: {username}")
+    print_info(f"RÉSULTATS POUR: {username}")
     print(color(f"  {'═' * 60}\n"))
     
     if found:
-        print_success(f"Profils potentiellement trouvés ({len(found)}):\n")
+        print_info(f"Profils possibles ({len(found)}):\n")
         for name, url in sorted(found):
             print(color(f"  ✓ {name:<20} → {url}"))
     
     print(color(f"\n  {'─' * 40}"))
-    print_info(f"Non trouvé: {len(not_found)} | Erreurs: {len(errors)}")
-    
-    if found:
-        data = {
-            "username": username,
-            "found_count": len(found),
-            "profiles": {name: url for name, url in found},
-            "not_found_count": len(not_found),
-        }
+    print_info(f"Absence apparente: {len(not_found)} | Erreurs: {len(errors)}")
+
+    print_warning("HTTP 200 ne prouve ni l'existence d'un profil ni une identité")
+    data = {
+        "username": username,
+        "found_count": len(found),
+        "profiles": {name: url for name, url in sorted(found)},
+        "profile_status": "possible",
+        "not_found_count": len(not_found),
+        "not_found": sorted(not_found),
+        "error_count": len(errors),
+        "errors": sorted(errors),
+        "status": "partial" if errors else "completed",
+        "interpretation": "Profils possibles et absences apparentes ; aucune identité confirmée",
+    }
     ask_save(f"social_{raw_username}", data)
 
 def email_osint():
@@ -2053,30 +1989,31 @@ def virustotal_check():
         if mode == "1":
             url = get_input("URL à vérifier")
             url_id = base64.urlsafe_b64encode(url.encode()).decode().strip("=")
-            r = requests.get(f"https://www.virustotal.com/api/v3/urls/{url_id}", headers=headers, timeout=15).json()
-            attrs = r.get("data", {}).get("attributes", {})
-            stats = attrs.get("last_analysis_stats", {})
+            r = requests.get(f"https://www.virustotal.com/api/v3/urls/{url_id}", headers=headers, timeout=15)
             
         elif mode == "2":
             domain = get_input("Domaine")
-            r = requests.get(f"https://www.virustotal.com/api/v3/domains/{domain}", headers=headers, timeout=15).json()
-            attrs = r.get("data", {}).get("attributes", {})
-            stats = attrs.get("last_analysis_stats", {})
+            r = requests.get(f"https://www.virustotal.com/api/v3/domains/{domain}", headers=headers, timeout=15)
             
         elif mode == "3":
             ip = get_input("Adresse IP")
-            r = requests.get(f"https://www.virustotal.com/api/v3/ip_addresses/{ip}", headers=headers, timeout=15).json()
-            attrs = r.get("data", {}).get("attributes", {})
-            stats = attrs.get("last_analysis_stats", {})
+            r = requests.get(f"https://www.virustotal.com/api/v3/ip_addresses/{ip}", headers=headers, timeout=15)
             
         elif mode == "4":
             file_hash = get_input("Hash (MD5/SHA1/SHA256)")
-            r = requests.get(f"https://www.virustotal.com/api/v3/files/{file_hash}", headers=headers, timeout=15).json()
-            attrs = r.get("data", {}).get("attributes", {})
-            stats = attrs.get("last_analysis_stats", {})
+            r = requests.get(f"https://www.virustotal.com/api/v3/files/{file_hash}", headers=headers, timeout=15)
         else:
             return
         
+        payload = response_object(r, "VirusTotal")
+        obj = payload.get("data")
+        attrs = obj.get("attributes") if isinstance(obj, dict) else None
+        stats = attrs.get("last_analysis_stats") if isinstance(attrs, dict) else None
+        required = ("malicious", "suspicious", "harmless", "undetected")
+        if (not isinstance(stats, dict) or not all(key in stats for key in required)
+                or any(type(value) is not int or value < 0 for value in stats.values())
+                or sum(stats[key] for key in required) == 0):
+            raise ValueError("VirusTotal: analyse absente, incomplète ou indisponible")
         data = {
             "Malicious": stats.get("malicious", 0),
             "Suspicious": stats.get("suspicious", 0),
@@ -2091,9 +2028,12 @@ def virustotal_check():
         if stats.get("malicious", 0) > 0:
             print_warning(f"⚠ DÉTECTÉ COMME MALVEILLANT PAR {stats['malicious']} MOTEURS!")
         else:
-            print_success("✓ Aucune détection malveillante")
+            print_info("Aucune détection malveillante dans cette analyse ; aucune garantie de sécurité")
         
+        data["Interpretation"] = "Statistiques de cette analyse uniquement ; aucune garantie de sécurité"
         ask_save("virustotal", data)
+    except requests.RequestException:
+        print_error("VirusTotal: erreur réseau, résultat indisponible")
     except Exception as e:
         print_error(f"Erreur: {e}")
 
@@ -2297,7 +2237,9 @@ def report_generator():
         print_error("Aucun résultat sauvegardé trouvé")
         return
     
-    files = [f for f in os.listdir(results_dir) if f.endswith('.json')]
+    files = sorted(f for f in os.listdir(results_dir)
+                   if f.endswith('.json') and not f.upper().startswith('REPORT_')
+                   and os.path.isfile(os.path.join(results_dir, f)))
     if not files:
         print_error("Aucun fichier JSON trouvé dans les résultats")
         return
@@ -2332,6 +2274,7 @@ def report_generator():
     # Construire le rapport
     report = {
         "title": "BlueFox OSINT Investigation Report",
+        "report_kind": "bluefox_investigation",
         "generated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "tool": f"BlueFox Tools v{__version__}",
         "sections": []
@@ -2341,54 +2284,23 @@ def report_generator():
         try:
             with open(os.path.join(results_dir, f), "r", encoding="utf-8") as fp:
                 content = json.load(fp)
+                if is_report(content):
+                    print_warning(f"Rapport déjà généré ignoré : {f}")
+                    continue
                 report["sections"].append({
                     "source_file": f,
                     "data": content
                 })
-        except:
-            pass
-    
-    # Sauvegarde du rapport
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    
-    # JSON
-    report_path = os.path.join(results_dir, f"REPORT_{timestamp}.json")
-    with open(report_path, "w", encoding="utf-8") as f:
-        json.dump(report, f, indent=4, ensure_ascii=False, default=str)
-    print_success(f"Rapport JSON: {report_path}")
-    
-    # TXT lisible
-    txt_path = os.path.join(results_dir, f"REPORT_{timestamp}.txt")
-    with open(txt_path, "w", encoding="utf-8") as f:
-        f.write("=" * 60 + "\n")
-        f.write("  BLUEFOX OSINT INVESTIGATION REPORT\n")
-        f.write(f"  Généré: {report['generated']}\n")
-        f.write(f"  Outil: {report['tool']}\n")
-        f.write("=" * 60 + "\n\n")
-        
-        for section in report["sections"]:
-            f.write(f"\n{'─' * 60}\n")
-            f.write(f"  SOURCE: {section['source_file']}\n")
-            f.write(f"{'─' * 60}\n\n")
-            
-            def write_dict(d, indent=2):
-                for k, v in d.items():
-                    if isinstance(v, dict):
-                        f.write(f"{' ' * indent}{k}:\n")
-                        write_dict(v, indent + 4)
-                    elif isinstance(v, list):
-                        f.write(f"{' ' * indent}{k}:\n")
-                        for item in v:
-                            if isinstance(item, dict):
-                                write_dict(item, indent + 4)
-                            else:
-                                f.write(f"{' ' * (indent+4)}- {item}\n")
-                    else:
-                        f.write(f"{' ' * indent}{k}: {v}\n")
-            
-            write_dict(section["data"])
-    
-    print_success(f"Rapport TXT: {txt_path}")
+        except (OSError, ValueError) as exc:
+            print_error(f"Source illisible {f}: {exc}. Rapport annulé")
+            return
+
+    if not report["sections"]:
+        print_error("Aucune source exploitable ; rapport annulé")
+        return
+    if save_result("REPORT", report, "json") is None:
+        return
+    save_result("REPORT", report_text(report), "txt")
 
 # ============================================================
 #  SYSTÈME DE MENUS

@@ -5,11 +5,13 @@ from Program import legacy_tools as core
 
 
 def run():
-    pwd = core.get_input("Mot de passe a auditer (local only)")
+    pwd = core.get_secret("Mot de passe a auditer (local only)")
     if not pwd:
         return
 
     core.print_header("PASSWORD STRENGTH ESTIMATOR")
+    core.print_warning("Estimation limitée : longueur et classes de caractères seulement. "
+                       "Dictionnaires et réutilisation non évalués ; aucune résistance démontrée.")
     charset = 0
     if any(c.islower() for c in pwd):
         charset += 26
@@ -31,7 +33,7 @@ def run():
 
     level = "Very Weak"
     if score >= 5 and entropy >= 50:
-        level = "Strong"
+        level = "Score élevé (estimation limitée)"
     elif score >= 4 and entropy >= 40:
         level = "Medium"
     elif score >= 3:
@@ -46,7 +48,7 @@ def run():
     }
     core.print_result("Length", str(data["length"]))
     core.print_result("Charset", str(data["charset_size"]))
-    core.print_result("Entropy", f"{entropy} bits")
+    core.print_result("Entropie théorique (tirage uniforme supposé)", f"{entropy} bits")
     core.print_result("Score", f"{score}/6")
     core.print_result("Level", level)
 

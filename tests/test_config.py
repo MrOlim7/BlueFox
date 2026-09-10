@@ -24,8 +24,8 @@ def test_one_live_manager_and_both_families_use_updated_key(monkeypatch):
     legacy_tools.CONFIG["ui_theme"] = "purple"
     assert config.get("ui_theme") == "purple"
     config.set("ipgeo_api_key", "fixture-key")
-    responses = [Mock(json=lambda: {"status": "success", "country": "Fixture"}),
-                 Mock(json=lambda: {"continent_name": "Fixture"})]
+    responses = [Mock(status_code=200, json=lambda: {"status": "success", "query": "192.0.2.1", "country": "Fixture", "countryCode": "FR", "isp": "Fixture", "lat": 1, "lon": 2}),
+                 Mock(status_code=200, json=lambda: {"continent_name": "Fixture"})]
     http = Mock(side_effect=responses * 2)
     monkeypatch.setattr("requests.get", http)
     assert IPLookupTool().run(ip="192.0.2.1")["success"]
@@ -33,7 +33,7 @@ def test_one_live_manager_and_both_families_use_updated_key(monkeypatch):
     monkeypatch.setattr(legacy_tools, "ask_save", Mock())
     legacy_tools.ip_lookup()
     assert len(http.call_args_list) == 4
-    assert all("fixture-key" in http.call_args_list[i].args[0] for i in (1, 3))
+    assert all(http.call_args_list[i].kwargs["params"]["apiKey"] == "fixture-key" for i in (1, 3))
 
 
 def test_layer_precedence_and_environment_not_saved(tmp_path):
